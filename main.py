@@ -4,6 +4,8 @@ import openpyxl
 import os
 import urllib.parse
 from datetime import datetime
+import re
+
 
 
 def validate_date(date_str):
@@ -62,21 +64,44 @@ def generate_booking_link(ss, dest_id, checkin, checkout, group_adults, no_rooms
 
     return full_url
 
-def create_excel_file(file_path):
+
+def create_excel_file(file_path, country):
+    """
+    Creates an Excel file with a specified file path and appends a country-specific timestamp to its name.
+
+    Args:
+        file_path (str): The initial file path.
+        country (str): The country name to append to the file name.
+
+    Returns:
+        str: The new file path if successful.
+        bool: False if an error occurs during file creation.
+    """
     # Ensure the output folder exists
     folder = os.path.dirname(file_path)
-    if not os.path.exists(folder):
+    if folder and not os.path.exists(folder):  # Check if the folder is non-empty and doesn't exist
         os.makedirs(folder)  # Create the folder if it doesn't exist
 
-    # Create the Excel file
-    if not os.path.exists(file_path):
+    # Add a timestamp and country to the file name
+    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')  # Format: YYYYMMDDHHMMSS
+    base, ext = os.path.splitext(file_path)
+    file_path = f"{base}_{country}_{timestamp}{ext}"
+
+    try:
+        # Create a new workbook and add a header row to the "Properties" sheet
         workbook = openpyxl.Workbook()
         sheet = workbook.active
         sheet.title = "Properties"
         sheet.append([
-            "Title", "Image Link", "URL Link", "Star Rating", "Map Link", "Review Rating", "Review Comment", "ReviewBy Count"
+            "Title", "Image Link", "URL Link", "Star Rating", "Map Link", "Review Rating", "Review Comment",
+            "ReviewBy Count"
         ])
         workbook.save(file_path)
+    except Exception as e:
+        print(f"Error creating the Excel file: {e}")  # Optional: Print the error message
+        return False
+
+    return file_path  # Return the new file path
 
 def append_to_excel(file_path, data):
     workbook = openpyxl.load_workbook(file_path)
@@ -123,7 +148,9 @@ def extract_properties(soup):
             review_div = card.find('div', {'data-testid': 'review-score'})
 
             review_score_div = review_div.find('div', class_='ac4a7896c7') if review_div else None
-            review_score = review_score_div.text.strip() if review_score_div else ""
+            review_score_text = review_score_div.text.strip() if review_score_div else ""
+            review_score_match = re.search(r'\d+(\.\d+)?', review_score_text)  # Regular expression to find the number
+            review_score = review_score_match.group(0) if review_score_match else ""
 
             review_comment_div = review_div.find('div', class_='a3b8729ab1 e6208ee469 cb2cbb3ccb') if review_div else None
             review_comment = review_comment_div.text.strip() if review_comment_div else ""
@@ -199,6 +226,7 @@ def main():
         response = requests.get(custom_link, headers=headers)
 
         response.raise_for_status()  # Raise exception for HTTP errors
+
         soup = BeautifulSoup(response.text, 'html.parser')
 
         # Create output directory if it doesn't exist
@@ -219,7 +247,7 @@ def main():
         print(f"Total properties found: {total_properties}")
 
         # Save data to Excel
-        create_excel_file(file_path)
+        file_path = create_excel_file(file_path, country)
         append_to_excel(file_path, properties)
 
         print(f"Data saved to {file_path}")
