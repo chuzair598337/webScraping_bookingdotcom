@@ -4,6 +4,12 @@ import openpyxl
 import os
 
 def create_excel_file(file_path):
+    # Ensure the output folder exists
+    folder = os.path.dirname(file_path)
+    if not os.path.exists(folder):
+        os.makedirs(folder)  # Create the folder if it doesn't exist
+
+    # Create the Excel file
     if not os.path.exists(file_path):
         workbook = openpyxl.Workbook()
         sheet = workbook.active
