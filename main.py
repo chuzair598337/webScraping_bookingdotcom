@@ -2,6 +2,65 @@ import requests
 from bs4 import BeautifulSoup
 import openpyxl
 import os
+import urllib.parse
+from datetime import datetime
+
+
+def validate_date(date_str):
+    """Validate the date format as YYYY-MM-DD."""
+    try:
+        datetime.strptime(date_str, "%Y-%m-%d")
+        return True
+    except ValueError:
+        return False
+
+def get_valid_input(prompt, validation_func=None, example_value=None):
+    """
+    Repeatedly prompt the user until they provide valid input.
+    Optionally validate the input with a validation function.
+    """
+    while True:
+        user_input = input(f"{prompt} (Example: {example_value}): ").strip()
+        if not user_input and example_value:
+            user_input = example_value  # Use the hard-coded default if no input
+        if validation_func and not validation_func(user_input):
+            print(f"Invalid input. Please try again.")
+        else:
+            return user_input
+
+def generate_booking_link(ss, dest_id, checkin, checkout, group_adults, no_rooms, group_children):
+    base_url = "https://www.booking.com/searchresults.html"
+
+    # Parameters from function arguments
+    parameters = {
+        "ss": ss,
+        "label": "gen173nr-1FCAQoggI49ANIM1gEaLUBiAEBmAExuAEHyAEM2AEB6AEB-AECiAIBqAIDuAKi6LC7BsACAdICJDhiMjE3ZWVhLTgxNjQtNDIxOS05OTRjLTM0YmQwNjRkNTY3YdgCBeACAQ",
+        "aid": "304142",
+        "lang": "en-us",
+        "sb": "1",
+        "src_elem": "sb",
+        "src": "searchresults",
+        "dest_id": dest_id,
+        "dest_type": "country",
+        "ac_position": "0",
+        "ac_click_type": "b",
+        "ac_langcode": "en",
+        "ac_suggestion_list_length": "5",
+        "search_selected": "true",
+        "search_pageview_id": "a0717491e092030b",
+        "ac_meta": "GhBhMDcxNzQ5MWUwOTIwMzBiIAAoATICZW46DVNhdWRpYSBBcmFiaWFAAUoMc2F1ZGkgYXJhYmlhULUB",
+        "checkin": checkin,
+        "checkout": checkout,
+        "group_adults": group_adults,
+        "no_rooms": no_rooms,
+        "group_children": group_children,
+    }
+
+    # Encode parameters and generate the full URL
+    query_string = urllib.parse.urlencode(parameters)
+    full_url = f"{base_url}?{query_string}"
+
+    return full_url
 
 def create_excel_file(file_path):
     # Ensure the output folder exists
@@ -82,43 +141,92 @@ def extract_properties(soup):
 
 def main():
     base_url = "https://www.booking.com/searchresults.html"
+
     file_path = "output/properties.xlsx"
 
-    # Input country from user
-    country = input("Enter the country: ")
+    # Collect validated input from the user
+    # country = get_valid_input("Enter the country", example_value="Saudia Arabia")
+    # checkin = get_valid_input("Enter check-in date (YYYY-MM-DD)", validate_date, "2024-12-25")
+    # checkout = get_valid_input("Enter check-out date (YYYY-MM-DD)", validate_date, "2024-12-26")
+    # group_adults = get_valid_input("Enter number of adults", lambda x: x.isdigit() and int(x) > 0, "8")
+    # no_rooms = get_valid_input("Enter number of rooms", lambda x: x.isdigit() and int(x) > 0, "3")
+    # group_children = get_valid_input("Enter number of children", lambda x: x.isdigit() and int(x) >= 0, "0")
 
-    # Prepare the search request
-    params = {
-        'ss': country,
-        'checkin_monthday': 25,
-        'checkin_year_month': '2024-12',
-        'checkout_monthday': 26,
-        'checkout_year_month': '2024-12',
-        'group_adults': 2,
-        'no_rooms': 1,
-        'group_children': 0
-    }
+    # Hard-coded data
+    country = "Saudia Arabia"
+    checkin = "2024-12-25"
+    checkout = "2024-12-26"
+    group_adults = "2"
+    no_rooms = "1"
 
-    # Send request
-    response = requests.get(base_url, params=params)
-    if response.status_code != 200:
-        print("Error fetching the page")
-        return
 
-    # Parse HTML
-    soup = BeautifulSoup(response.text, 'html.parser')
+    custom_link = generate_booking_link(
+        ss=country,
+        dest_id="0",
+        checkin=checkin,
+        checkout=checkout,
+        group_adults=group_adults,
+        no_rooms=no_rooms,
+        group_children= "0"
+    )
 
-    # Extract properties
-    total_properties, properties = extract_properties(soup)
+    # custom_link = "https://www.booking.com/searchresults.html"
+    custom_link = "https://www.booking.com/searchresults.html?ss=Saudia+Arabia"
 
-    # Print total properties
-    print(f"Total properties found: {total_properties}")
+    print("\nGenerated Booking Link:")
+    print(custom_link)
 
-    # Save data to Excel
-    create_excel_file(file_path)
-    append_to_excel(file_path, properties)
 
-    print(f"Data saved to {file_path}")
+    # Send request and handle errors
+    try:
+        # Cookies extracted from your browser
+        cookies = {
+            "pcm_personalization_disabled": "0",
+            "pcm_consent": "consentedAt%3D2024-12-25T19%3A05%3A40.536Z%26countryCode%3DPK%26expiresAt%3D2025-06-23T19%3A05%3A40.536Z%26implicit%3Dfalse%26regionCode%3DPB%26regulation%3Dnone%26legacyRegulation%3Dnone%26consentId%3D00000000-0000-0000-0000-000000000000%26analytical%3Dfalse%26marketing%3Dfalse",
+            "aws-waf-token": "a43d4f8c-2469-44bc-a1f6-4571a11e7990:BQoAjyWKBDhtAAAA:GmUWlkxKD68L9fDEBlzVsrWdM1EwkJJUCnkc4NFWkCzuT1KwvGGWqaVZAH9EqajbFXkTXCurMNn2I3GCoEIuip/LXqCpYz08P4E/dyb7LZLTIJ8+WSza9Bwo6QgKFLK6+G+X6Cy1ZfRS6PMEFRCydpOON1vaOrkbVU35SRjy3YocEF3ShqFIDsSwSYldwqCrIUhVWmyaU3p0JaCP0IDUXvZn/sz4Q2tgGibju5hAfppDLx7M3cqtBG7gJc43Pm6GSY8=",
+            "OptanonConsent": "isGpcEnabled=0&datestamp=Thu+Dec+26+2024+00%3A33%3A07+GMT%2B0500+(Pakistan+Standard+Time)&version=202403.2.0&browserGpcFlag=0&isIABGlobal=false&hosts=&consentId=29e3769b-c2af-49e6-8728-3067c567ef16&interactionCount=1&isAnonUser=1&landingPath=NotLandingPage&groups=C0001%3A1%2CC0002%3A1%2CC0004%3A1&implicitConsentCountry=nonGDPR&implicitConsentDate=1735153293058&AwaitingReconsent=false"
+        }
+
+        # Build the Cookie header
+        cookie_header = "; ".join([f"{key}={value}" for key, value in cookies.items()])
+
+        # Headers including the cookies
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36",
+            "Cookie": cookie_header
+        }
+
+        response = requests.get(custom_link, headers=headers)
+
+        response.raise_for_status()  # Raise exception for HTTP errors
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        # Create output directory if it doesn't exist
+        output_dir = os.path.join(os.getcwd(), "output")
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Save parsed HTML to a file
+        output_file_path = os.path.join(output_dir, "index.html")
+        with open(output_file_path, "w", encoding="utf-8") as file:
+            file.write(soup.prettify())
+
+        print(f"HTML content saved to: {output_file_path}")
+
+        # Extract properties
+        total_properties, properties = extract_properties(soup)
+
+        # Print total properties
+        print(f"Total properties found: {total_properties}")
+
+        # Save data to Excel
+        create_excel_file(file_path)
+        append_to_excel(file_path, properties)
+
+        print(f"Data saved to {file_path}")
+
+    except requests.RequestException as e:
+        print(f"An error occurred: {e}")
+
 
 if __name__ == "__main__":
     main()
