@@ -6,7 +6,57 @@ import urllib.parse
 from datetime import datetime
 import re
 
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import time
 
+
+def load_all_results(url, output_file):
+    # Initialize the Selenium WebDriver (use your browser driver here, e.g., ChromeDriver)
+    driver = webdriver.Chrome()  # Replace with the path to your ChromeDriver if not in PATH
+    driver.get(url)
+
+    # Wait for the page to load
+    wait = WebDriverWait(driver, 20)
+
+    try:
+        # Loop to click the "Load more results" button until all data is loaded
+        while True:
+            try:
+                load_more_button = wait.until(
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, ".c82435a4b8.f581fde0b8 button"))
+                )
+
+                # Check if the button is disabled or hidden
+                if not load_more_button.is_enabled() or load_more_button.get_attribute("style") == "display: none;":
+                    print("Load more button is disabled or hidden. All data might be loaded.")
+                    break
+
+                # Scroll to the button to ensure it's in view
+                driver.execute_script("arguments[0].scrollIntoView();", load_more_button)
+
+                # Click the "Load more results" button
+                load_more_button.click()
+
+                # Wait for new data to load
+                time.sleep(2)
+            except Exception as e:
+                # Log any exception and break the loop
+                print(f"Encountered an issue: {e}")
+                break
+
+        # Save the fully loaded HTML
+        html_content = driver.page_source
+        with open(output_file, "w", encoding="utf-8") as file:
+            file.write(html_content)
+        print(f"HTML content saved to: {output_file}")
+
+    finally:
+        # Close the browser
+        driver.quit()
 
 def validate_date(date_str):
     """Validate the date format as YYYY-MM-DD."""
@@ -206,39 +256,51 @@ def main():
 
     # Send request and handle errors
     try:
-        # Cookies extracted from your browser
-        cookies = {
-            "pcm_personalization_disabled": "0",
-            "pcm_consent": "consentedAt%3D2024-12-25T19%3A05%3A40.536Z%26countryCode%3DPK%26expiresAt%3D2025-06-23T19%3A05%3A40.536Z%26implicit%3Dfalse%26regionCode%3DPB%26regulation%3Dnone%26legacyRegulation%3Dnone%26consentId%3D00000000-0000-0000-0000-000000000000%26analytical%3Dfalse%26marketing%3Dfalse",
-            "aws-waf-token": "a43d4f8c-2469-44bc-a1f6-4571a11e7990:BQoAjyWKBDhtAAAA:GmUWlkxKD68L9fDEBlzVsrWdM1EwkJJUCnkc4NFWkCzuT1KwvGGWqaVZAH9EqajbFXkTXCurMNn2I3GCoEIuip/LXqCpYz08P4E/dyb7LZLTIJ8+WSza9Bwo6QgKFLK6+G+X6Cy1ZfRS6PMEFRCydpOON1vaOrkbVU35SRjy3YocEF3ShqFIDsSwSYldwqCrIUhVWmyaU3p0JaCP0IDUXvZn/sz4Q2tgGibju5hAfppDLx7M3cqtBG7gJc43Pm6GSY8=",
-            "OptanonConsent": "isGpcEnabled=0&datestamp=Thu+Dec+26+2024+00%3A33%3A07+GMT%2B0500+(Pakistan+Standard+Time)&version=202403.2.0&browserGpcFlag=0&isIABGlobal=false&hosts=&consentId=29e3769b-c2af-49e6-8728-3067c567ef16&interactionCount=1&isAnonUser=1&landingPath=NotLandingPage&groups=C0001%3A1%2CC0002%3A1%2CC0004%3A1&implicitConsentCountry=nonGDPR&implicitConsentDate=1735153293058&AwaitingReconsent=false"
-        }
+        #
+        # # Cookies extracted from your browser
+        # cookies = {
+        #     "pcm_personalization_disabled": "0",
+        #     "pcm_consent": "consentedAt%3D2024-12-25T19%3A05%3A40.536Z%26countryCode%3DPK%26expiresAt%3D2025-06-23T19%3A05%3A40.536Z%26implicit%3Dfalse%26regionCode%3DPB%26regulation%3Dnone%26legacyRegulation%3Dnone%26consentId%3D00000000-0000-0000-0000-000000000000%26analytical%3Dfalse%26marketing%3Dfalse",
+        #     "aws-waf-token": "a43d4f8c-2469-44bc-a1f6-4571a11e7990:BQoAjyWKBDhtAAAA:GmUWlkxKD68L9fDEBlzVsrWdM1EwkJJUCnkc4NFWkCzuT1KwvGGWqaVZAH9EqajbFXkTXCurMNn2I3GCoEIuip/LXqCpYz08P4E/dyb7LZLTIJ8+WSza9Bwo6QgKFLK6+G+X6Cy1ZfRS6PMEFRCydpOON1vaOrkbVU35SRjy3YocEF3ShqFIDsSwSYldwqCrIUhVWmyaU3p0JaCP0IDUXvZn/sz4Q2tgGibju5hAfppDLx7M3cqtBG7gJc43Pm6GSY8=",
+        #     "OptanonConsent": "isGpcEnabled=0&datestamp=Thu+Dec+26+2024+00%3A33%3A07+GMT%2B0500+(Pakistan+Standard+Time)&version=202403.2.0&browserGpcFlag=0&isIABGlobal=false&hosts=&consentId=29e3769b-c2af-49e6-8728-3067c567ef16&interactionCount=1&isAnonUser=1&landingPath=NotLandingPage&groups=C0001%3A1%2CC0002%3A1%2CC0004%3A1&implicitConsentCountry=nonGDPR&implicitConsentDate=1735153293058&AwaitingReconsent=false"
+        # }
+        #
+        # # Build the Cookie header
+        # cookie_header = "; ".join([f"{key}={value}" for key, value in cookies.items()])
+        #
+        # # Headers including the cookies
+        # headers = {
+        #     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36",
+        #     "Cookie": cookie_header
+        # }
+        #
+        # response = requests.get(custom_link, headers=headers)
+        #
+        # response.raise_for_status()  # Raise exception for HTTP errors
+        #
+        # soup = BeautifulSoup(response.text, 'html.parser')
+        #
+        # # Create output directory if it doesn't exist
+        # output_dir = os.path.join(os.getcwd(), "output")
+        # os.makedirs(output_dir, exist_ok=True)
+        #
+        # # Save parsed HTML to a file
+        # output_file_path = os.path.join(output_dir, "index.html")
+        # with open(output_file_path, "w", encoding="utf-8") as file:
+        #     file.write(soup.prettify())
+        #
+        # print(f"HTML content saved to: {output_file_path}")
 
-        # Build the Cookie header
-        cookie_header = "; ".join([f"{key}={value}" for key, value in cookies.items()])
-
-        # Headers including the cookies
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36",
-            "Cookie": cookie_header
-        }
-
-        response = requests.get(custom_link, headers=headers)
-
-        response.raise_for_status()  # Raise exception for HTTP errors
-
-        soup = BeautifulSoup(response.text, 'html.parser')
-
-        # Create output directory if it doesn't exist
         output_dir = os.path.join(os.getcwd(), "output")
         os.makedirs(output_dir, exist_ok=True)
+        output_file_path = os.path.join(output_dir, "all_results.html")
 
-        # Save parsed HTML to a file
-        output_file_path = os.path.join(output_dir, "index.html")
-        with open(output_file_path, "w", encoding="utf-8") as file:
-            file.write(soup.prettify())
+        # Call the function
+        load_all_results(custom_link, output_file_path)
 
-        print(f"HTML content saved to: {output_file_path}")
+        # Load the saved HTML file with BeautifulSoup
+        with open(output_file_path, "r", encoding="utf-8") as file:
+            soup = BeautifulSoup(file, "html.parser")
 
         # Extract properties
         total_properties, properties = extract_properties(soup)
