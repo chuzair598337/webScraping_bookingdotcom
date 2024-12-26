@@ -13,22 +13,43 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import time
 
-
 def load_all_results(url, output_file):
+    """Load all results from the given URL and save the final HTML to a file."""
     # Initialize the Selenium WebDriver (use your browser driver here, e.g., ChromeDriver)
     driver = webdriver.Chrome()  # Replace with the path to your ChromeDriver if not in PATH
     driver.get(url)
 
     # Wait for the page to load
-    wait = WebDriverWait(driver, 20)
+    wait = WebDriverWait(driver, 40)
 
     try:
+        # Inside your loop:
+        found_clickable = False
+        while not found_clickable:
+            try:
+                # Check for clickable button
+                wait.until(
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, ".c82435a4b8.f581fde0b8 button"))
+                )
+                print("The 'Load more results' button is clickable.")
+                found_clickable = True  # Set flag to True to stop further checks
+                break  # Exit the loop
+            except Exception as e:
+                print(f"Error: {e}")
+
         # Loop to click the "Load more results" button until all data is loaded
         while True:
             try:
-                load_more_button = wait.until(
-                    EC.element_to_be_clickable((By.CSS_SELECTOR, ".c82435a4b8.f581fde0b8 button"))
-                )
+
+                print("Loading more data ...")
+
+                # Find the "Load more results" button
+                load_more_buttons = driver.find_elements(By.CSS_SELECTOR, ".c82435a4b8.f581fde0b8 button")
+                if not load_more_buttons:
+                    print("No 'Load more' button found. All data might be loaded.")
+                    break
+
+                load_more_button = load_more_buttons[0]  # Use the first button found
 
                 # Check if the button is disabled or hidden
                 if not load_more_button.is_enabled() or load_more_button.get_attribute("style") == "display: none;":
@@ -42,7 +63,7 @@ def load_all_results(url, output_file):
                 load_more_button.click()
 
                 # Wait for new data to load
-                time.sleep(2)
+                time.sleep(10)
             except Exception as e:
                 # Log any exception and break the loop
                 print(f"Encountered an issue: {e}")
@@ -58,6 +79,7 @@ def load_all_results(url, output_file):
         # Close the browser
         driver.quit()
 
+
 def validate_date(date_str):
     """Validate the date format as YYYY-MM-DD."""
     try:
@@ -65,6 +87,7 @@ def validate_date(date_str):
         return True
     except ValueError:
         return False
+
 
 def get_valid_input(prompt, validation_func=None, example_value=None):
     """
@@ -143,7 +166,7 @@ def create_excel_file(file_path, country):
         sheet = workbook.active
         sheet.title = "Properties"
         sheet.append([
-            "Title", "Image Link", "URL Link", "Star Rating", "Map Link", "Review Rating", "Review Comment",
+            "Title", "Image Link", "URL Link", "Star Rating","Location", "Map Link", "Review Rating", "Review Comment",
             "ReviewBy Count"
         ])
         workbook.save(file_path)
@@ -194,6 +217,10 @@ def extract_properties(soup):
             map_link_tag = map_div.find('a') if map_div else None
             map_link = map_link_tag['href'] if map_link_tag else ""
 
+            # location
+            location_span = map_link_tag.find('span', {'data-testid': 'address'})
+            location = location_span.text.strip() if location_span else ""
+
             # Review Score, Comment, and Count
             review_div = card.find('div', {'data-testid': 'review-score'})
 
@@ -209,7 +236,7 @@ def extract_properties(soup):
             review_count = review_count_div.text.strip() if review_count_div else ""
 
             results.append([
-                title, image_link, url_link, star_rating, map_link, review_score, review_comment, review_count
+                title, image_link, url_link, star_rating, location, map_link, review_score, review_comment, review_count
             ])
         except Exception as e:
             print(f"Error processing a property card: {e}")
@@ -305,8 +332,11 @@ def main():
         # Extract properties
         total_properties, properties = extract_properties(soup)
 
+        # Sorting results list A to Z by the 1st column
+        properties = sorted(properties, key=lambda x: x[0])
+
         # Print total properties
-        print(f"Total properties found: {total_properties}")
+        print(f"Total properties Exist: {total_properties}")
 
         # Save data to Excel
         file_path = create_excel_file(file_path, country)
